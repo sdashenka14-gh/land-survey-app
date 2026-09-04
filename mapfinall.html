@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Land Survey Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    body { margin: 0; font-family: Arial; }
+    #map { height: 100vh; }
+    #panel {
+      position: fixed; top: 10px; right: 10px;
+      background: white; padding: 15px;
+      border-radius: 8px; width: 220px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      z-index: 1000;
+    }
+    #panel h3 { margin: 0 0 10px 0; font-size: 14px; }
+    .legend-item { margin: 5px 0; font-size: 13px; }
+    .dot { display: inline-block; width: 12px; 
+           height: 12px; border-radius: 50%; 
+           margin-right: 6px; }
+  </style>
+</head>
+<body>
+
+<div id="panel">
+  <h3>🗺️ Land Survey Map</h3>
+  <div class="legend-item">
+    <span class="dot" style="background:green"></span>Verified
+  </div>
+  <div class="legend-item">
+    <span class="dot" style="background:red"></span>Disputed
+  </div>
+  <div class="legend-item">
+    <span class="dot" style="background:orange"></span>Pending
+  </div>
+  <br>
+  <button onclick="loadParcels()" 
+    style="width:100%; padding:8px; background:#2196F3; 
+    color:white; border:none; border-radius:4px; cursor:pointer;">
+    🔄 Refresh Map
+  </button>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  // Map centered on Kogilu village near Yelahanka
+  var map = L.map('map').setView([13.1089, 77.5930], 15);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  function loadParcels() {
+    fetch('http://127.0.0.1:5000/parcels')
+      .then(r => r.json())
+      .then(parcels => {
+        // Clear existing polygons
+        map.eachLayer(layer => {
+          if (layer instanceof L.Polygon) map.removeLayer(layer);
+        });
+
+        parcels.forEach(p => {
+          var color = p.status === 'verified'  ? 'green'
+                    : p.status === 'disputed'  ? 'red'
+                    : 'orange';
+
+          // Convert [lon, lat] → [lat, lon] for Leaflet
+          var coords = p.boundary.coordinates[0].map(c => [c[1], c[0]]);
+
+          var polygon = L.polygon(coords, {
+            color: color,
+            fillOpacity: 0.4
+          }).addTo(map);
+
+          polygon.bindPopup(
+            "<b>" + p.name + "</b><br>" +
+            "<b>Owner:</b> " + p.owner + "<br>" +
+            "<b>Survey No:</b> " + p.survey_no + "<br>" +
+            "<b>Status:</b> <span style='color:" + color + "'>" 
+            + p.status.toUpperCase() + "</span>"
+          );
+
+          // Auto open popup if disputed
+          if (p.status === 'disputed') {
+            polygon.openPopup();
+          }
+        });
+      });
+  }
+
+  // Load parcels when page opens
+  loadParcels();
+
+  // Auto refresh every 5 seconds
+  setInterval(loadParcels, 5000);
+</script>
+</body>
+</html>
